@@ -4,7 +4,14 @@ import "fmt"
 
 func main() {
 	fmt.Println("Starting with parsing")
-	parse()
+	err := parse()
+	if err != nil {
+		fmt.Println("Following Error occurred: ")
+		fmt.Println(err)
+		_, _ = fmt.Scanln()
+		fmt.Println("Press any key to quit")
+		return
+	}
 	fmt.Println("File generated")
 
 	fmt.Println("Press any key to quit")

@@ -16,9 +16,9 @@ func readAndParseFiles() ([]SimPadData, error) {
 		return []SimPadData{}, err
 	}
 
-	results := make([]SimPadData, len(entries))
+	var results []SimPadData
 
-	for index, entry := range entries {
+	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
@@ -46,12 +46,12 @@ func readAndParseFiles() ([]SimPadData, error) {
 			log.Println(err.Error())
 			continue
 		}
-		results[index] = SimPadData{
+		results = append(results, SimPadData{
 			EventList: parsedList,
 			Log:       parsedLog,
-		}
-	}
+		})
 
+	}
 	return results, err
 }
 
@@ -133,19 +133,19 @@ func setCPRValues(file *excelize.File, cprValues map[string]SimPadCPREventParame
 	}
 }
 
-func setValuesForEntry(file *excelize.File, data *SimPadData) {
+func setValuesForEntry(file *excelize.File, data *SimPadData) error {
 	extractedCPR := extractRequiredCPRParams(data)
 	extractedLog := extractRequiredLogParams(data)
 
 	rows, err := file.GetRows("Daten Kontrolle")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Println(rows[0][0])
 
 	cols, err := file.GetCols("Daten Kontrolle")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// New Func
@@ -164,24 +164,27 @@ func setValuesForEntry(file *excelize.File, data *SimPadData) {
 		setLogValues(file, extractedLog, key, firstFreeCol, r)
 		setCPRValues(file, extractedCPR, key, firstFreeCol, r)
 	}
-
+	return nil
 }
 
-func parse() {
+func parse() error {
 	results, err := readAndParseFiles()
 	if err != nil {
-		log.Fatal()
+		return err
 	}
 
 	f, err := excelize.OpenFile("template.xlsx")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	for i := range results {
-		setValuesForEntry(f, &results[i])
+		err = setValuesForEntry(f, &results[i])
+		if err != nil {
+			return err
+		}
 	}
 
 	err = f.SaveAs("output.xlsx")
-	log.Println(err)
+	return err
 }
