@@ -87,10 +87,26 @@ func extractRequiredCPRParams(data *SimPadData) map[string]SimPadCPREventParamet
 }
 
 func extractRequiredLogParams(data *SimPadData) map[string]string {
+
+	var instructor string
+	var scenario string
+
+	if len(data.Log.Instructors.Persons) < 1 {
+		instructor = "unknown"
+	} else {
+		instructor = data.Log.Instructors.Persons[0].Name
+	}
+
+	if len(data.Log.Students.Persons) < 3 {
+		scenario = "unknown"
+	} else {
+		scenario = data.Log.Students.Persons[2].Name
+	}
+
 	paramMap := map[string]string{
 		"Szenario":  data.Log.Description,
-		"Prüfer":    data.Log.Instructors.Persons[0].Name,
-		"Gruppe":    data.Log.Students.Persons[2].Name,
+		"Prüfer":    instructor,
+		"Gruppe":    scenario,
 		"Fall":      "",
 		"Timestamp": data.Log.SessionDateTimeUTC,
 	}
@@ -141,7 +157,6 @@ func setValuesForEntry(file *excelize.File, data *SimPadData) error {
 	if err != nil {
 		return err
 	}
-	log.Println(rows[0][0])
 
 	cols, err := file.GetCols("Daten Kontrolle")
 	if err != nil {
@@ -156,7 +171,6 @@ func setValuesForEntry(file *excelize.File, data *SimPadData) error {
 			break
 		}
 	}
-	log.Println(firstFreeCol)
 
 	for r, row := range rows[1:] {
 		key := row[1]
