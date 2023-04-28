@@ -5,25 +5,26 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
-func main() {
-	err := os.MkdirAll("logs", 0777)
+func logSetup(logDir string) {
+	err := os.MkdirAll(logDir, 0777)
 	if err != nil {
 		fmt.Printf("could not create log dir due to err: %v \n", err)
 		_, _ = fmt.Scanln()
-		fmt.Println("Press any key to quit")
+		fmt.Println("Press enter to quit")
 		os.Exit(1)
 	}
 	now := time.Now()
-	f, err := os.OpenFile("logs/log-"+now.Format("02-01-2006-15-04-05"),
+	f, err := os.OpenFile(logDir+"/log-"+now.Format("02-01-2006-15-04-05"),
 		os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
 
 	if err != nil {
 		fmt.Printf("could not open a log file due to err: %v \n", err)
 		_, _ = fmt.Scanln()
-		fmt.Println("Press any key to quit")
+		fmt.Println("Press enter to quit")
 		os.Exit(1)
 	}
 
@@ -31,21 +32,56 @@ func main() {
 
 	mw := io.MultiWriter(os.Stdout, f)
 	log.SetOutput(mw)
+}
+
+func inputSetup(inputDir string) {
+	err := os.MkdirAll(inputDir, 0777)
+	if err != nil {
+		fmt.Printf("could not create input dir due to err: %v \n", err)
+		_, _ = fmt.Scanln()
+		fmt.Println("Press enter to quit")
+		os.Exit(1)
+	}
+
+	entries, err := os.ReadDir(inputDir)
+	if err != nil {
+		fmt.Printf("could not read input files due to err: %v \n", err)
+		_, _ = fmt.Scanln()
+		fmt.Println("Press enter to quit")
+		os.Exit(1)
+	}
+	if len(entries) == 0 {
+		fmt.Println("There are currently no files in the input dir, please put them there.")
+
+		fmt.Println("To continue press enter, to exit, enter 'exit' and press enter")
+		var scan string
+		_, _ = fmt.Scanln(&scan)
+		if strings.ToUpper(scan) == "EXIT" {
+			os.Exit(0)
+		}
+	}
+}
+
+func main() {
+	inputDir := "./input"
+
+	logSetup("./logs")
+	inputSetup(inputDir)
 
 	log.Println("Starting with parsing")
-	err = parse()
+	err := parse(inputDir)
 	if err != nil {
 		log.Println("Following Error occurred: ")
 
 		log.Println(err)
 		_, _ = fmt.Scanln()
-		fmt.Println("Press any key to quit")
+		fmt.Println("Press enter to quit")
 		log.Println("Program closed with error")
 		return
 	}
 	log.Println("File generated")
 
-	fmt.Println("Press any key to quit")
+	fmt.Println("Press enter to quit")
 	_, _ = fmt.Scanln()
 	log.Println("Program closed successfully")
 }

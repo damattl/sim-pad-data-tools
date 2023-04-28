@@ -53,3 +53,8 @@ type SimPadLog struct {
 		} `xml:"Person"`
 	} `xml:"Students"`
 }
+
+type ProcessedSimPadData struct {
+	Log map[string]string
+	CPR map[string]SimPadCPREventParameter
+}

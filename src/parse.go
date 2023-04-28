@@ -7,13 +7,14 @@ import (
 	"log"
 	"os"
 	"sort"
+	"time"
 )
 
 const logPath = "/EventLog.xml"
 const cprEventsPath = "/CPR/CPREvents.xml"
 
-func readAndParseFiles() ([]SimPadData, error) {
-	entries, err := os.ReadDir("./input")
+func readAndParseFiles(inputDir string) ([]SimPadData, error) {
+	entries, err := os.ReadDir(inputDir)
 	if err != nil {
 		return []SimPadData{}, err
 	}
@@ -24,12 +25,12 @@ func readAndParseFiles() ([]SimPadData, error) {
 		if !entry.IsDir() {
 			continue
 		}
-		rawCPRData, err := os.ReadFile("./input/" + entry.Name() + cprEventsPath)
+		rawCPRData, err := os.ReadFile(inputDir + "/" + entry.Name() + cprEventsPath)
 		if err != nil {
 			log.Println(err.Error())
 			continue
 		}
-		rawLogData, err := os.ReadFile("./input/" + entry.Name() + logPath)
+		rawLogData, err := os.ReadFile(inputDir + "/" + entry.Name() + logPath)
 		if err != nil {
 			log.Println(err.Error())
 			continue
@@ -101,7 +102,7 @@ func extractRequiredLogParams(data *SimPadData) map[string]string {
 
 	if len(data.Log.Students.Persons) < 3 {
 		group = "unknown"
-		fmt.Println("Unknown Group, Known data: ")
+		fmt.Println("Unknown Group here is some known data: ")
 		fmt.Printf("Szenario: %v \n", data.Log.Description)
 		fmt.Printf("Prüfer: %v \n", instructor)
 		fmt.Printf("Timestamp: %v \n", data.Log.SessionDateTimeUTC)
@@ -112,7 +113,9 @@ func extractRequiredLogParams(data *SimPadData) map[string]string {
 		_, _ = fmt.Scanln(&scan)
 		if scan != "" {
 			group = scan
+			fmt.Printf("Changed Group to: %v", scan)
 		}
+
 	} else {
 		group = data.Log.Students.Persons[2].Name
 	}
@@ -163,9 +166,7 @@ func setCPRValues(file *excelize.File, cprValues map[string]SimPadCPREventParame
 	}
 }
 
-func setValuesForEntry(file *excelize.File, data *SimPadData) error {
-	extractedCPR := extractRequiredCPRParams(data)
-	extractedLog := extractRequiredLogParams(data)
+func setValuesForEntry(file *excelize.File, data *ProcessedSimPadData) error {
 
 	rows, err := file.GetRows("Daten Kontrolle")
 	if err != nil {
@@ -189,14 +190,64 @@ func setValuesForEntry(file *excelize.File, data *SimPadData) error {
 	for r, row := range rows[1:] {
 		key := row[1]
 
-		setLogValues(file, extractedLog, key, firstFreeCol, r)
-		setCPRValues(file, extractedCPR, key, firstFreeCol, r)
+		setLogValues(file, data.Log, key, firstFreeCol, r)
+		setCPRValues(file, data.CPR, key, firstFreeCol, r)
 	}
 	return nil
 }
 
-func parse() error {
-	results, err := readAndParseFiles()
+func sortData(data []SimPadData) []ProcessedSimPadData {
+	dataToDateMap := make(map[string][]ProcessedSimPadData)
+	for _, entry := range data {
+		parsedTime, err := time.Parse("2006-01-02T15:04:05", entry.Log.SessionDateTimeUTC)
+		if err != nil {
+			fmt.Println("Could not parse time")
+			// TODO: Handle better
+			continue
+		}
+		dateOnly := parsedTime.Format("2006-01-02")
+
+		extractedCPR := extractRequiredCPRParams(&entry)
+		extractedLog := extractRequiredLogParams(&entry)
+		processed := ProcessedSimPadData{
+			extractedLog,
+			extractedCPR,
+		}
+
+		if list, ok := dataToDateMap[dateOnly]; ok {
+			list = append(list, processed)
+			dataToDateMap[dateOnly] = list
+		} else {
+			dataToDateMap[dateOnly] = []ProcessedSimPadData{processed}
+		}
+	}
+
+	var sortedByGroup [][]ProcessedSimPadData
+	for _, list := range dataToDateMap {
+		sort.Slice(list, func(i, j int) bool {
+			return list[i].Log["Gruppe"] < list[j].Log["Gruppe"]
+		})
+		sortedByGroup = append(sortedByGroup, list)
+	}
+
+	sort.Slice(sortedByGroup, func(i, j int) bool {
+		if len(sortedByGroup[i]) < 1 || len(sortedByGroup[j]) < 1 {
+			return true // TODO: check if this make sense
+		}
+		return sortedByGroup[i][0].Log["Timestamp"] < sortedByGroup[j][0].Log["Timestamp"]
+	})
+
+	var sorted []ProcessedSimPadData
+	for _, list := range sortedByGroup {
+		sorted = append(sorted, list...)
+	}
+
+	return sorted
+}
+
+func parse(inputDir string) error {
+
+	results, err := readAndParseFiles(inputDir)
 	if err != nil {
 		return err
 	}
@@ -206,12 +257,10 @@ func parse() error {
 		return err
 	}
 
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Log.SessionDateTimeUTC < results[j].Log.SessionDateTimeUTC
-	})
+	sorted := sortData(results)
 
-	for i := range results {
-		err = setValuesForEntry(f, &results[i])
+	for i := range sorted {
+		err = setValuesForEntry(f, &sorted[i])
 		if err != nil {
 			return err
 		}
