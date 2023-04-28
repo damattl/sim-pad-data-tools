@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/xml"
+	"fmt"
 	"github.com/xuri/excelize/v2"
 	"log"
 	"os"
+	"sort"
 )
 
 const logPath = "/EventLog.xml"
@@ -89,7 +91,7 @@ func extractRequiredCPRParams(data *SimPadData) map[string]SimPadCPREventParamet
 func extractRequiredLogParams(data *SimPadData) map[string]string {
 
 	var instructor string
-	var scenario string
+	var group string
 
 	if len(data.Log.Instructors.Persons) < 1 {
 		instructor = "unknown"
@@ -98,15 +100,27 @@ func extractRequiredLogParams(data *SimPadData) map[string]string {
 	}
 
 	if len(data.Log.Students.Persons) < 3 {
-		scenario = "unknown"
+		group = "unknown"
+		fmt.Println("Unknown Group, Known data: ")
+		fmt.Printf("Szenario: %v \n", data.Log.Description)
+		fmt.Printf("Prüfer: %v \n", instructor)
+		fmt.Printf("Timestamp: %v \n", data.Log.SessionDateTimeUTC)
+		fmt.Println("Keep in mind that the timestamp is in Coordinated Universal Time")
+		fmt.Println("Please add a group and press enter: ")
+
+		var scan string
+		_, _ = fmt.Scanln(&scan)
+		if scan != "" {
+			group = scan
+		}
 	} else {
-		scenario = data.Log.Students.Persons[2].Name
+		group = data.Log.Students.Persons[2].Name
 	}
 
 	paramMap := map[string]string{
 		"Szenario":  data.Log.Description,
 		"Prüfer":    instructor,
-		"Gruppe":    scenario,
+		"Gruppe":    group,
 		"Fall":      "",
 		"Timestamp": data.Log.SessionDateTimeUTC,
 	}
@@ -191,6 +205,10 @@ func parse() error {
 	if err != nil {
 		return err
 	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Log.SessionDateTimeUTC < results[j].Log.SessionDateTimeUTC
+	})
 
 	for i := range results {
 		err = setValuesForEntry(f, &results[i])
