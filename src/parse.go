@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"github.com/xuri/excelize/v2"
@@ -36,6 +37,15 @@ func readAndParseFiles(inputDir string) ([]SimPadData, error) {
 			continue
 		}
 
+		var logOverride = LogOverrideData{}
+		logOverrideData, err := os.ReadFile(inputDir + "/" + entry.Name() + "/log-override.json")
+		if err == nil {
+			err := json.Unmarshal(logOverrideData, &logOverride)
+			if err != nil {
+				log.Println(err.Error())
+			}
+		}
+
 		var parsedLog SimPadLog
 		err = xml.Unmarshal(rawLogData, &parsedLog)
 		if err != nil {
@@ -50,150 +60,13 @@ func readAndParseFiles(inputDir string) ([]SimPadData, error) {
 			continue
 		}
 		results = append(results, SimPadData{
-			EventList: parsedList,
-			Log:       parsedLog,
+			EventList:   parsedList,
+			Log:         parsedLog,
+			LogOverride: logOverride,
 		})
 
 	}
 	return results, err
-}
-
-func createCPRParamMap() map[string]SimPadCPREventParameter {
-	paramMap := map[string]SimPadCPREventParameter{}
-	for _, param := range requiredCPRParams {
-		paramMap[param] = SimPadCPREventParameter{}
-	}
-	return paramMap
-}
-func createLogParamMap() map[string]string {
-	paramMap := map[string]string{}
-	for _, param := range requiredLogParams {
-		paramMap[param] = ""
-	}
-	return paramMap
-}
-
-func extractRequiredCPRParams(data *SimPadData) map[string]SimPadCPREventParameter {
-	paramMap := createCPRParamMap()
-
-	for _, event := range data.EventList.Events {
-		for _, param := range event.Params {
-			if _, ok := paramMap[param.Type]; ok {
-				if param.Type == "endTime" && event.Type != "CprSessionInfo" {
-					continue
-				}
-				paramMap[param.Type] = param
-			}
-		}
-	}
-	return paramMap
-}
-
-func extractRequiredLogParams(data *SimPadData) map[string]string {
-
-	var instructor string
-	var group string
-
-	if len(data.Log.Instructors.Persons) < 1 {
-		instructor = "unknown"
-	} else {
-		instructor = data.Log.Instructors.Persons[0].Name
-	}
-
-	if len(data.Log.Students.Persons) < 3 {
-		group = "unknown"
-		fmt.Println("Unknown Group here is some known data: ")
-		fmt.Printf("Szenario: %v \n", data.Log.Description)
-		fmt.Printf("Prüfer: %v \n", instructor)
-		fmt.Printf("Timestamp: %v \n", data.Log.SessionDateTimeUTC)
-		fmt.Println("Keep in mind that the timestamp is in Coordinated Universal Time")
-		fmt.Println("Please add a group and press enter: ")
-
-		var scan string
-		_, _ = fmt.Scanln(&scan)
-		if scan != "" {
-			group = scan
-			fmt.Printf("Changed Group to: %v", scan)
-		}
-
-	} else {
-		group = data.Log.Students.Persons[2].Name
-	}
-
-	paramMap := map[string]string{
-		"Szenario":  data.Log.Description,
-		"Prüfer":    instructor,
-		"Gruppe":    group,
-		"Fall":      "",
-		"Timestamp": data.Log.SessionDateTimeUTC,
-	}
-
-	return paramMap
-}
-
-func setLogValues(file *excelize.File, logValues map[string]string, key string, col int, row int) {
-	paramMap := createLogParamMap()
-	if _, ok := paramMap[key]; ok {
-		cellName, err := excelize.CoordinatesToCellName(col+1, row+2)
-		if err != nil {
-			log.Println(err.Error())
-			return
-		}
-		value := logValues[key]
-		err = file.SetCellDefault("Daten Kontrolle", cellName, value)
-		if err != nil {
-			log.Println(err.Error())
-			return
-		}
-	}
-}
-
-func setCPRValues(file *excelize.File, cprValues map[string]SimPadCPREventParameter, key string, col int, row int) {
-	paramMap := createCPRParamMap()
-	if _, ok := paramMap[key]; ok {
-		cellName, err := excelize.CoordinatesToCellName(col+1, row+2)
-		if err != nil {
-			log.Println(err.Error())
-			return
-		}
-		value := cprValues[key].Value
-
-		err = file.SetCellDefault("Daten Kontrolle", cellName, value)
-		if err != nil {
-			log.Println(err.Error())
-			return
-		}
-	}
-}
-
-func setValuesForEntry(file *excelize.File, data *ProcessedSimPadData) error {
-
-	rows, err := file.GetRows("Daten Kontrolle")
-	if err != nil {
-		return err
-	}
-
-	cols, err := file.GetCols("Daten Kontrolle")
-	if err != nil {
-		return err
-	}
-
-	// New Func
-	var firstFreeCol int
-	for i, col := range cols[3:] {
-		if col[1] == "" {
-			firstFreeCol = i + 3
-			break
-		}
-	}
-
-	for r, row := range rows[1:] {
-		key := row[1]
-
-		setLogValues(file, data.Log, key, firstFreeCol, r)
-		setCPRValues(file, data.CPR, key, firstFreeCol, r)
-	}
-	return nil
 }
 
 func sortData(data []SimPadData) []ProcessedSimPadData {

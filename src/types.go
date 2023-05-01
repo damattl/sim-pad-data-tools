@@ -3,8 +3,9 @@ package main
 import "encoding/xml"
 
 type SimPadData struct {
-	EventList SimPadCPREventList
-	Log       SimPadLog
+	EventList   SimPadCPREventList
+	Log         SimPadLog
+	LogOverride LogOverrideData
 }
 
 type SimPadCPREventParameter struct {
@@ -54,7 +55,14 @@ type SimPadLog struct {
 	} `xml:"Students"`
 }
 
+type LogOverrideData struct {
+	Scenario   string `json:"scenario"`
+	Instructor string `json:"instructor"`
+	Group      string `json:"group"`
+	Case       string `json:"case"`
+}
+
 type ProcessedSimPadData struct {
 	Log map[string]string
-	CPR map[string]SimPadCPREventParameter
+	CPR map[string]map[string]SimPadCPREventParameter
 }
