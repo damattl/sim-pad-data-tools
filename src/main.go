@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"strings"
 	"time"
 )
@@ -42,7 +43,7 @@ func inputSetup(inputDir string) {
 		fmt.Println("Press enter to quit")
 		os.Exit(1)
 	}
-
+	fmt.Println(os.Executable())
 	entries, err := os.ReadDir(inputDir)
 	if err != nil {
 		fmt.Printf("could not read input files due to err: %v \n", err)
@@ -50,10 +51,12 @@ func inputSetup(inputDir string) {
 		fmt.Println("Press enter to quit")
 		os.Exit(1)
 	}
+
 	if len(entries) == 0 {
 		fmt.Println("There are currently no files in the input dir, please put them there.")
 
-		fmt.Println("To continue press enter, to exit, enter 'exit' and press enter")
+		fmt.Println("To continue press enter.")
+		fmt.Println("To exit, enter 'exit' and press enter")
 		var scan string
 		_, _ = fmt.Scanln(&scan)
 		if strings.ToUpper(scan) == "EXIT" {
@@ -63,21 +66,24 @@ func inputSetup(inputDir string) {
 }
 
 func main() {
-	inputDir := "./input"
+	execPath, err := os.Executable()
+	if err != nil {
+		printErrorAndWaitForExit(err)
+	}
+	execDir := path.Dir(execPath)
+	if err != nil {
+		printErrorAndWaitForExit(err)
+	}
 
-	logSetup("./logs")
+	inputDir := path.Join(execDir, "input")
+
+	logSetup(path.Join(execDir, "logs"))
 	inputSetup(inputDir)
 
 	log.Println("Starting with parsing")
-	err := parse(inputDir)
+	err = parse(inputDir, execDir)
 	if err != nil {
-		log.Println("Following Error occurred: ")
-
-		log.Println(err)
-		_, _ = fmt.Scanln()
-		fmt.Println("Press enter to quit")
-		log.Println("Program closed with error")
-		return
+		printErrorAndWaitForExit(err)
 	}
 	log.Println("File generated")
 

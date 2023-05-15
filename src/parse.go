@@ -7,6 +7,7 @@ import (
 	"github.com/xuri/excelize/v2"
 	"log"
 	"os"
+	"path"
 	"sort"
 	"time"
 )
@@ -118,14 +119,14 @@ func sortData(data []SimPadData) []ProcessedSimPadData {
 	return sorted
 }
 
-func parse(inputDir string) error {
+func parse(inputDir string, execDir string) error {
 
 	results, err := readAndParseFiles(inputDir)
 	if err != nil {
 		return err
 	}
 
-	f, err := excelize.OpenFile("template.xlsx")
+	f, err := excelize.OpenFile(path.Join(execDir, "template.xlsx"))
 	if err != nil {
 		return err
 	}
@@ -139,6 +140,6 @@ func parse(inputDir string) error {
 		}
 	}
 
-	err = f.SaveAs("output.xlsx")
+	err = f.SaveAs(path.Join(execDir, "output.xlsx"))
 	return err
 }
